@@ -1,262 +1,265 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Trash2, 
-  ShoppingCart, 
-  RefreshCw, 
-  Receipt,
-  AlertCircle
-} from 'lucide-react';
-
-const App = () => {
-  const [exchangeRate, setExchangeRate] = useState(0.0245);
-  const [loading, setLoading] = useState(true);
-  const [price, setPrice] = useState('');
-  const [itemName, setItemName] = useState('');
-  const [history, setHistory] = useState([]);
-  const [lastUpdated, setLastUpdated] = useState('');
-  
-  const FEE_RATE = 0.015;
-
-  const fetchRate = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('https://open.er-api.com/v6/latest/KRW');
-      const data = await response.json();
-      if (data.rates.TWD) {
-        setExchangeRate(data.rates.TWD);
-        setLastUpdated(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      }
-    } catch (err) {
-      console.error("匯率同步失敗");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRate();
-  }, []);
-
-  // 2026 韓國退稅級距計算 (依據上傳圖片)
-  const getRefundAmount = (krw) => {
-    if (krw < 30000) return 0;
-    if (krw >= 250000) return 15500;
-    if (krw >= 225000) return 13500;
-    if (krw >= 200000) return 12250;
-    if (krw >= 175000) return 10500;
-    if (krw >= 150000) return 9250;
-    if (krw >= 125000) return 8000;
-    if (krw >= 100000) return 6500;
-    if (krw >= 75000) return 5000;
-    if (krw >= 50000) return 3250;
-    if (krw >= 30000) return 1750;
-    return 0;
-  };
-
-  const krwAmount = parseFloat(price) || 0;
-  const refundKrw = getRefundAmount(krwAmount);
-  
-  const rawTwd = Math.round(krwAmount * exchangeRate);
-  const feeTwd = Math.round(rawTwd * FEE_RATE);
-  const originalTotalTwd = rawTwd + feeTwd; 
-  
-  const refundTwd = Math.round(refundKrw * exchangeRate);
-  const finalTotalTwd = originalTotalTwd - refundTwd;
-
-  const addToHistory = () => {
-    // 現在只檢查價格是否有輸入
-    if (!price || krwAmount <= 0) return;
-
-    const newItem = {
-      id: Date.now(),
-      // 如果沒有名稱，預設為 "未命名項目"
-      name: itemName.trim() || "未命名項目",
-      krw: krwAmount,
-      originalTotalTwd: originalTotalTwd,
-      refundTwd: refundTwd,
-      total: finalTotalTwd,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setHistory([newItem, ...history]);
-    setItemName('');
-    setPrice('');
-  };
-
-  const removeItem = (id) => {
-    setHistory(history.filter(item => item.id !== id));
-  };
-
-  const totalSummary = history.reduce((acc, curr) => acc + curr.total, 0);
-
-  return (
-    <div className="min-h-screen bg-white text-zinc-900 font-sans p-4 md:p-10 transition-colors">
-      <div className="max-w-md mx-auto">
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRW CALC. 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,700;0,900;1,900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .italic-black { font-style: italic; font-weight: 900; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-white text-zinc-900 transition-colors duration-300">
+    <div class="max-w-md mx-auto p-4 md:p-10">
         
-        {/* Header - 右上角 Total 顯示 */}
-        <header className="mb-8 flex justify-between items-center border-b border-zinc-100 pb-6">
-          <div className="flex flex-col">
-            <h1 className="text-2xl font-black tracking-tighter italic leading-none">KRW CALC.</h1>
-            <p className="text-[9px] tracking-[0.1em] text-zinc-400 font-bold uppercase mt-1 italic">Tax Assistant 2026</p>
-          </div>
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1 italic">Total Expenses</span>
-            <div className="text-3xl font-black text-zinc-900 tracking-tighter italic leading-none">
-              NT$ {totalSummary.toLocaleString()}
+        <!-- Header -->
+        <header class="mb-8 flex justify-between items-center border-b border-zinc-100 pb-6">
+            <div class="flex flex-col">
+                <h1 class="text-2xl italic-black tracking-tighter leading-none">KRW CALC.</h1>
+                <p class="text-[9px] tracking-[0.1em] text-zinc-400 font-bold uppercase mt-1 italic">Tax Assistant 2026</p>
             </div>
-          </div>
+            <div class="flex flex-col items-end">
+                <span class="text-[10px] font-black text-zinc-400 uppercase tracking-widest leading-none mb-1 italic">Total Expenses</span>
+                <div id="grand-total" class="text-3xl italic-black text-zinc-900 tracking-tighter leading-none">
+                    NT$ 0
+                </div>
+            </div>
         </header>
 
-        {/* 匯率資訊 */}
-        <div className="mb-8">
-          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 flex justify-between items-end shadow-sm">
-            <div>
-              <span className="text-[9px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Exchange Rate</span>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-black leading-none">{exchangeRate.toFixed(4)}</span>
-                <span className="text-[10px] font-bold text-zinc-400 uppercase italic">KRW/TWD</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <button onClick={fetchRate} className="text-[9px] font-black text-zinc-900 border border-zinc-900 px-2 py-1 rounded-md hover:bg-zinc-900 hover:text-white transition-all uppercase flex items-center gap-1">
-                <RefreshCw size={10} className={loading ? 'animate-spin' : ''} /> Sync
-              </button>
-              <p className="text-[8px] text-zinc-300 font-bold mt-1 uppercase leading-none italic">{lastUpdated}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* 輸入區域 */}
-        <div className="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm mb-8">
-          <div className="space-y-5">
-            <div>
-              <label className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1 mb-2 block font-mono italic">Item Name (Optional)</label>
-              <input 
-                type="text" 
-                placeholder="選填名稱"
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                className="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-4 text-sm focus:bg-white focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-zinc-300"
-              />
-            </div>
-            
-            <div>
-              <label className="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1 mb-2 block font-mono italic">Price (KRW)</label>
-              <div className="relative">
-                <input 
-                  type="number" 
-                  placeholder="0"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && addToHistory()}
-                  className="w-full bg-zinc-900 text-white rounded-2xl p-6 text-4xl font-black outline-none focus:ring-4 focus:ring-zinc-100 transition-all font-mono"
-                />
-                <div className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-600 font-bold text-lg italic uppercase">krw</div>
-              </div>
-              
-              {krwAmount >= 30000 && (
-                <div className="mt-3 flex items-center gap-1.5 text-red-500 text-[10px] font-black animate-pulse px-1 uppercase italic tracking-tighter">
-                  <AlertCircle size={14} />
-                  符合退稅資格 (單筆已滿 30,000 ₩)
-                </div>
-              )}
-            </div>
-
-            {/* 即時金額預覽 */}
-            {krwAmount > 0 && (
-              <div className="px-1 space-y-3 pt-2">
-                <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 uppercase">
-                  <span>原換匯價 (含 1.5% 手續費)</span>
-                  <span className="font-mono">NT$ {originalTotalTwd.toLocaleString()}</span>
-                </div>
-                {refundTwd > 0 && (
-                  <div className="flex justify-between items-center text-[10px] font-black text-zinc-900 uppercase italic">
-                    <span className="flex items-center gap-1"><Receipt size={12}/> 預估退稅額</span>
-                    <span className="text-red-500 font-mono">- NT$ {refundTwd}</span>
-                  </div>
-                )}
-                <div className="h-px bg-zinc-50 w-full"></div>
-                <div className="flex justify-between items-center">
-                  <div className="text-zinc-400 text-[9px] font-black uppercase italic leading-none">最終實付金額 NT$</div>
-                  <div className="text-3xl font-black text-zinc-900 leading-none italic tracking-tighter">
-                    {finalTotalTwd.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <button 
-              onClick={addToHistory}
-              disabled={!price || krwAmount <= 0}
-              className="w-full bg-zinc-900 text-white py-5 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-black active:scale-[0.98] transition-all disabled:bg-zinc-100 disabled:text-zinc-300 shadow-md"
-            >
-              <Plus size={20} strokeWidth={3} />
-              ADD TO LIST
-            </button>
-          </div>
-        </div>
-
-        {/* 採購紀錄清單 */}
-        <div className="mb-24 px-1">
-          <div className="flex items-center justify-between mb-8 border-l-4 border-black pl-4">
-            <h2 className="text-xs font-black uppercase tracking-widest text-zinc-400 leading-none italic">Shopping History</h2>
-            <span className="text-[9px] font-black text-zinc-300 uppercase italic tracking-widest">{history.length} ITEMS</span>
-          </div>
-
-          <div className="space-y-6">
-            {history.length === 0 ? (
-              <div className="text-center py-20 border-2 border-dashed border-zinc-100 rounded-[2rem]">
-                <p className="text-zinc-300 text-[10px] font-black uppercase tracking-[0.2em]">Start Tracking</p>
-              </div>
-            ) : (
-              history.map((item) => (
-                <div key={item.id} className="relative bg-white border-b-2 border-zinc-100 pb-6 flex flex-col group transition-all">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex flex-col">
-                      <h3 className="font-black text-zinc-900 text-xl uppercase italic tracking-tight leading-none mb-1">{item.name}</h3>
-                      <span className="text-[9px] font-black text-zinc-300 uppercase tracking-widest">{item.time}</span>
+        <!-- 匯率資訊 -->
+        <div class="mb-8">
+            <div class="bg-zinc-50 border border-zinc-200 rounded-2xl p-5 flex justify-between items-end shadow-sm">
+                <div>
+                    <span class="text-[9px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Exchange Rate</span>
+                    <div class="flex items-baseline gap-1">
+                        <span id="rate-display" class="text-3xl font-black leading-none">0.0245</span>
+                        <span class="text-[10px] font-bold text-zinc-400 uppercase italic">KRW/TWD</span>
                     </div>
-                    <button 
-                      onClick={() => removeItem(item.id)}
-                      className="p-2 text-zinc-200 hover:text-black transition-colors"
-                    >
-                      <Trash2 size={16} />
+                </div>
+                <div class="text-right">
+                    <button onclick="fetchRate()" class="text-[9px] font-black text-zinc-900 border border-zinc-900 px-2 py-1 rounded-md hover:bg-zinc-900 hover:text-white transition-all uppercase flex items-center gap-1">
+                        <i id="sync-icon" class="fa-solid fa-arrows-rotate"></i> Sync
                     </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
-                      <span className="text-[9px] font-black text-zinc-400 uppercase block mb-1 leading-none">原換匯價 (含手續費)</span>
-                      <span className="text-sm font-black text-zinc-500 font-mono italic tracking-tighter">NT$ {item.originalTotalTwd.toLocaleString()}</span>
-                    </div>
-                    <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
-                      <span className="text-[9px] font-black text-red-400 uppercase block mb-1 leading-none tracking-tighter">預估退稅</span>
-                      <span className="text-sm font-black text-red-500 font-mono italic tracking-tighter">- NT$ {item.refundTwd}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-end">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-zinc-300 uppercase tracking-widest leading-none mb-1">Original KRW</span>
-                      <span className="text-xs font-bold text-zinc-400 leading-none">₩ {item.krw.toLocaleString()}</span>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-[9px] font-black text-zinc-300 uppercase italic leading-none mb-1 tracking-widest">Subtotal</span>
-                      <span className="text-2xl font-black text-zinc-900 italic tracking-tighter leading-none">
-                        NT$ {item.total.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
+                    <p id="sync-time" class="text-[8px] text-zinc-300 font-bold mt-1 uppercase leading-none italic">Loading...</p>
                 </div>
-              ))
-            )}
-          </div>
+            </div>
         </div>
 
-      </div>
-    </div>
-  );
-};
+        <!-- 輸入區域 -->
+        <div class="bg-white border border-zinc-200 rounded-3xl p-6 shadow-sm mb-8">
+            <div class="space-y-5">
+                <div>
+                    <label class="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1 mb-2 block italic">Item Name (Optional)</label>
+                    <input type="text" id="item-name" placeholder="選填名稱" 
+                        class="w-full bg-zinc-50 border border-zinc-100 rounded-xl p-4 text-sm focus:bg-white focus:ring-1 focus:ring-black outline-none transition-all placeholder:text-zinc-300">
+                </div>
+                
+                <div>
+                    <label class="text-[9px] font-black text-zinc-400 uppercase tracking-[0.2em] ml-1 mb-2 block italic">Price (KRW)</label>
+                    <div class="relative">
+                        <input type="number" id="item-price" placeholder="0" 
+                            class="w-full bg-zinc-900 text-white rounded-2xl p-6 text-4xl font-black outline-none focus:ring-4 focus:ring-zinc-100 transition-all">
+                        <div class="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-600 font-bold text-lg italic uppercase">krw</div>
+                    </div>
+                    
+                    <div id="refund-alert" class="hidden mt-3 items-center gap-1.5 text-red-500 text-[10px] font-black animate-pulse px-1 uppercase italic tracking-tighter">
+                        <i class="fa-solid fa-circle-exclamation"></i> 符合退稅資格 (單筆已滿 30,000 ₩)
+                    </div>
+                </div>
 
-export default App;
+                <!-- 即時預覽 -->
+                <div id="preview-area" class="hidden px-1 space-y-3 pt-2">
+                    <div class="flex justify-between items-center text-[10px] font-bold text-zinc-400 uppercase">
+                        <span>原換匯價 (含 1.5% 手續費)</span>
+                        <span id="preview-original">NT$ 0</span>
+                    </div>
+                    <div id="preview-refund-row" class="hidden flex justify-between items-center text-[10px] font-black text-zinc-900 uppercase italic">
+                        <span class="flex items-center gap-1"><i class="fa-solid fa-receipt"></i> 預估退稅額</span>
+                        <span id="preview-refund" class="text-red-500">- NT$ 0</span>
+                    </div>
+                    <div class="h-px bg-zinc-50 w-full"></div>
+                    <div class="flex justify-between items-center">
+                        <div class="text-zinc-400 text-[9px] font-black uppercase italic leading-none">最終實付 NT$</div>
+                        <div id="preview-total" class="text-3xl italic-black text-zinc-900 leading-none tracking-tighter">0</div>
+                    </div>
+                </div>
+
+                <button onclick="addItem()" class="w-full bg-zinc-900 text-white py-5 rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-black active:scale-[0.98] transition-all shadow-md">
+                    <i class="fa-solid fa-plus"></i> ADD TO LIST
+                </button>
+            </div>
+        </div>
+
+        <!-- 清單 -->
+        <div class="mb-24 px-1">
+            <div class="flex items-center justify-between mb-8 border-l-4 border-black pl-4">
+                <h2 class="text-xs font-black uppercase tracking-widest text-zinc-400 leading-none italic">Shopping History</h2>
+                <span id="item-count" class="text-[9px] font-black text-zinc-300 uppercase italic tracking-widest">0 ITEMS</span>
+            </div>
+            <div id="history-list" class="space-y-6">
+                <div class="text-center py-20 border-2 border-dashed border-zinc-100 rounded-[2rem]">
+                    <p class="text-zinc-300 text-[10px] font-black uppercase tracking-[0.2em]">Start Tracking</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let exchangeRate = 0.0245;
+        let history = [];
+        const FEE_RATE = 0.015;
+
+        // 初始化匯率
+        async function fetchRate() {
+            const icon = document.getElementById('sync-icon');
+            icon.classList.add('animate-spin');
+            try {
+                const res = await fetch('https://open.er-api.com/v6/latest/KRW');
+                const data = await res.json();
+                if (data.rates.TWD) {
+                    exchangeRate = data.rates.TWD;
+                    document.getElementById('rate-display').innerText = exchangeRate.toFixed(4);
+                    document.getElementById('sync-time').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+            } catch (e) { console.error("Sync failed"); }
+            finally { icon.classList.remove('animate-spin'); }
+        }
+
+        // 2026 退稅邏輯
+        function getRefundKrw(krw) {
+            if (krw < 30000) return 0;
+            if (krw >= 250000) return 15500;
+            if (krw >= 225000) return 13500;
+            if (krw >= 200000) return 12250;
+            if (krw >= 175000) return 10500;
+            if (krw >= 150000) return 9250;
+            if (krw >= 125000) return 8000;
+            if (krw >= 100000) return 6500;
+            if (krw >= 75000) return 5000;
+            if (krw >= 50000) return 3250;
+            if (krw >= 30000) return 1750;
+            return 0;
+        }
+
+        // 即時監聽輸入
+        document.getElementById('item-price').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value) || 0;
+            const preview = document.getElementById('preview-area');
+            const alert = document.getElementById('refund-alert');
+            
+            if (val > 0) {
+                preview.classList.remove('hidden');
+                alert.classList.toggle('hidden', val < 30000);
+                
+                const refundKrw = getRefundKrw(val);
+                const rawTwd = Math.round(val * exchangeRate);
+                const feeTwd = Math.round(rawTwd * FEE_RATE);
+                const originalTotal = rawTwd + feeTwd;
+                const refundTwd = Math.round(refundKrw * exchangeRate);
+                
+                document.getElementById('preview-original').innerText = `NT$ ${originalTotal.toLocaleString()}`;
+                document.getElementById('preview-refund').innerText = `- NT$ ${refundTwd.toLocaleString()}`;
+                document.getElementById('preview-refund-row').classList.toggle('hidden', refundKrw === 0);
+                document.getElementById('preview-total').innerText = (originalTotal - refundTwd).toLocaleString();
+            } else {
+                preview.classList.add('hidden');
+                alert.classList.add('hidden');
+            }
+        });
+
+        function addItem() {
+            const priceVal = parseFloat(document.getElementById('item-price').value);
+            const nameVal = document.getElementById('item-name').value.trim() || "未命名項目";
+            
+            if (!priceVal || priceVal <= 0) return;
+
+            const refundKrw = getRefundKrw(priceVal);
+            const rawTwd = Math.round(priceVal * exchangeRate);
+            const feeTwd = Math.round(rawTwd * FEE_RATE);
+            const originalTotal = rawTwd + feeTwd;
+            const refundTwd = Math.round(refundKrw * exchangeRate);
+            const finalTotal = originalTotal - refundTwd;
+
+            const item = {
+                id: Date.now(),
+                name: nameVal,
+                krw: priceVal,
+                originalTotal,
+                refundTwd,
+                total: finalTotal,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            history.unshift(item);
+            updateUI();
+            
+            // 重置
+            document.getElementById('item-price').value = '';
+            document.getElementById('item-name').value = '';
+            document.getElementById('preview-area').classList.add('hidden');
+            document.getElementById('refund-alert').classList.add('hidden');
+        }
+
+        function removeItem(id) {
+            history = history.filter(i => i.id !== id);
+            updateUI();
+        }
+
+        function updateUI() {
+            const list = document.getElementById('history-list');
+            const grandTotal = document.getElementById('grand-total');
+            const itemCount = document.getElementById('item-count');
+
+            if (history.length === 0) {
+                list.innerHTML = `<div class="text-center py-20 border-2 border-dashed border-zinc-100 rounded-[2rem]"><p class="text-zinc-300 text-[10px] font-black uppercase tracking-[0.2em]">Start Tracking</p></div>`;
+            } else {
+                list.innerHTML = history.map(item => `
+                    <div class="relative bg-white border-b-2 border-zinc-100 pb-6 flex flex-col group transition-all">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex flex-col">
+                                <h3 class="font-black text-zinc-900 text-xl uppercase italic tracking-tight leading-none mb-1">${item.name}</h3>
+                                <span class="text-[9px] font-black text-zinc-300 uppercase tracking-widest">${item.time}</span>
+                            </div>
+                            <button onclick="removeItem(${item.id})" class="p-2 text-zinc-200 hover:text-black transition-colors">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+                                <span class="text-[9px] font-black text-zinc-400 uppercase block mb-1 leading-none">原換匯價 (含手續費)</span>
+                                <span class="text-sm font-black text-zinc-500 font-mono italic tracking-tighter">NT$ ${item.originalTotal.toLocaleString()}</span>
+                            </div>
+                            <div class="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+                                <span class="text-[9px] font-black text-red-400 uppercase block mb-1 leading-none tracking-tighter">預估退稅</span>
+                                <span class="text-sm font-black text-red-500 font-mono italic tracking-tighter">- NT$ ${item.refundTwd.toLocaleString()}</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <div class="flex flex-col">
+                                <span class="text-[9px] font-black text-zinc-300 uppercase tracking-widest leading-none mb-1">Original KRW</span>
+                                <span class="text-xs font-bold text-zinc-400 leading-none">₩ ${item.krw.toLocaleString()}</span>
+                            </div>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[9px] font-black text-zinc-300 uppercase italic leading-none mb-1 tracking-widest">Subtotal</span>
+                                <span class="text-2xl italic-black text-zinc-900 tracking-tighter leading-none">
+                                    NT$ ${item.total.toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const total = history.reduce((sum, item) => sum + item.total, 0);
+            grandTotal.innerText = `NT$ ${total.toLocaleString()}`;
+            itemCount.innerText = `${history.length} ITEMS`;
+        }
+
+        window.onload = fetchRate;
+    </script>
+</body>
+</html>
