@@ -31,21 +31,26 @@
             margin: 0; 
         }
 
-        /* 針對 GitHub Pages 部署後的移動端優化 */
-        .sticky-bottom {
-            padding-bottom: calc(1rem + var(--ios-safe-area-bottom));
-        }
-
         /* 點擊回饋動畫 */
         .btn-active:active {
             transform: scale(0.96);
+        }
+
+        /* 入場動畫 */
+        .animate-in {
+            animation: fadeInSlide 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeInSlide {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
 <body class="bg-white text-zinc-900 transition-colors duration-300">
     <div class="max-w-md mx-auto p-5 md:p-10 min-h-screen flex flex-col">
         
-        <!-- Header -->
+        <!-- Header - 右上角總計 -->
         <header class="mb-8 flex justify-between items-center border-b border-zinc-100 pb-6">
             <div class="flex flex-col">
                 <h1 class="text-2xl italic-black tracking-tighter leading-none">KRW CALC.</h1>
@@ -130,9 +135,7 @@
                 <span id="item-count" class="text-[9px] font-black text-zinc-300 uppercase italic tracking-widest">0 ITEMS</span>
             </div>
             <div id="history-list" class="space-y-6">
-                <div class="text-center py-20 border-2 border-dashed border-zinc-100 rounded-[2rem]">
-                    <p class="text-zinc-300 text-[10px] font-black uppercase tracking-[0.2em]">List is Empty</p>
-                </div>
+                <!-- 列表內容會由 JS 生成 -->
             </div>
         </div>
 
@@ -146,7 +149,7 @@
         let history = [];
         const FEE_RATE = 0.015;
 
-        // 初始化匯率與本地存儲 (GitHub Pages 即使關閉瀏覽器也能保存資料)
+        // 初始化
         function init() {
             const savedHistory = localStorage.getItem('krw_history');
             if (savedHistory) {
@@ -163,7 +166,6 @@
             icon.classList.add('animate-spin');
             
             try {
-                // 使用帶有緩存控制的 API
                 const res = await fetch('https://open.er-api.com/v6/latest/KRW');
                 const data = await res.json();
                 if (data.rates && data.rates.TWD) {
@@ -178,6 +180,7 @@
             }
         }
 
+        // 2026 退稅邏輯
         function getRefundKrw(krw) {
             if (krw < 30000) return 0;
             if (krw >= 250000) return 15500;
@@ -193,7 +196,7 @@
             return 0;
         }
 
-        // 輸入監聽
+        // 即時預覽監聽
         document.getElementById('item-price').addEventListener('input', (e) => {
             const val = parseFloat(e.target.value) || 0;
             const preview = document.getElementById('preview-area');
@@ -219,6 +222,7 @@
             }
         });
 
+        // 加入清單
         function addItem() {
             const priceEl = document.getElementById('item-price');
             const nameEl = document.getElementById('item-name');
@@ -247,7 +251,7 @@
             history.unshift(item);
             saveAndRefresh();
             
-            // 重置輸入
+            // 重置
             priceEl.value = '';
             nameEl.value = '';
             document.getElementById('preview-area').classList.add('hidden');
@@ -274,7 +278,7 @@
                 list.innerHTML = `<div class="text-center py-20 border-2 border-dashed border-zinc-100 rounded-[2rem]"><p class="text-zinc-300 text-[10px] font-black uppercase tracking-[0.2em]">List is Empty</p></div>`;
             } else {
                 list.innerHTML = history.map(item => `
-                    <div class="relative bg-white border-b-2 border-zinc-100 pb-6 flex flex-col group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div class="relative bg-white border-b-2 border-zinc-100 pb-6 flex flex-col animate-in">
                         <div class="flex justify-between items-start mb-4">
                             <div class="flex flex-col">
                                 <h3 class="font-black text-zinc-900 text-xl uppercase italic tracking-tight leading-none mb-1">${item.name}</h3>
@@ -286,7 +290,7 @@
                         </div>
                         <div class="grid grid-cols-2 gap-4 mb-4">
                             <div class="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
-                                <span class="text-[9px] font-black text-zinc-400 uppercase block mb-1 leading-none">原換匯價 (含費)</span>
+                                <span class="text-[9px] font-black text-zinc-400 uppercase block mb-1 leading-none">原價 (含費)</span>
                                 <span class="text-sm font-black text-zinc-500 font-mono italic tracking-tighter">NT$ ${item.originalTotal.toLocaleString()}</span>
                             </div>
                             <div class="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
@@ -315,10 +319,13 @@
             itemCount.innerText = `${history.length} ITEMS`;
         }
 
-        // 支持按下 Enter 鍵加入
+            // 支持 Enter 鍵
         document.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
-                addItem();
+                const activeEl = document.activeElement;
+                if (activeEl.id === 'item-price' || activeEl.id === 'item-name') {
+                    addItem();
+                }
             }
         });
 
